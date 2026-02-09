@@ -1,0 +1,95 @@
+{
+  "register": {
+    "count": 16,
+    "width": 16,
+    "signed": false
+  },
+
+  "numerisch": {
+
+    "spannung": {
+      "register": 0,
+      "type": "uint16",
+      "scale": 100.0,
+      "min": 0.0,
+      "max": 60.0,
+      "unit": "V",
+      "access": "rw"
+    },
+
+    "strom": {
+      "register": 1,
+      "type": "uint16",
+      "scale": 1000.0,
+      "min": 0.0,
+      "max": 10.0,
+      "unit": "A",
+      "access": "rw"
+    },
+
+    "temperatur": {
+      "register": 2,
+      "type": "int16",
+      "scale": 10.0,
+      "min": -40.0,
+      "max": 125.0,
+      "unit": "°C",
+      "access": "r"
+    },
+
+    "leistung": {
+      "register": 3,
+      "type": "uint16",
+      "scale": 1.0,
+      "min": 0.0,
+      "max": 1000.0,
+      "unit": "W",
+      "access": "r"
+    }
+  },
+
+  "binaer": {
+
+    "enable": {
+      "register": 10,
+      "bit": 0,
+      "access": "rw"
+    },
+
+    "reset": {
+      "register": 10,
+      "bit": 1,
+      "access": "rw"
+    },
+
+    "start": {
+      "register": 10,
+      "bit": 2,
+      "access": "rw"
+    },
+
+    "stop": {
+      "register": 10,
+      "bit": 3,
+      "access": "rw"
+    },
+
+    "bereit": {
+      "register": 11,
+      "bit": 0,
+      "access": "r"
+    },
+
+    "betrieb": {
+      "register": 11,
+      "bit": 1,
+      "access": "r"
+    },
+
+    "fehler": {
+      "register": 11,
+      "bit": 2,
+      "access": "r"
+    }
+  }
+}

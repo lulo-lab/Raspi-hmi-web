@@ -1,109 +1,54 @@
 from fastapi import FastAPI, HTTPException
-from datetime import datetime
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from datetime import datetime
+
+from register_service import RegisterService
 
 
-app = FastAPI()
+# ------------------------------------------------
+# INIT
+# ------------------------------------------------
+
+app = FastAPI(title="FPGA HMI Backend")
+
+reg = RegisterService("register_map.json")
 
 
-#middleware options
+# ------------------------------------------------
+# CORS
+# ------------------------------------------------
+
 origins = [
-    "http://localhost:5173",  # Beispiel: dein Frontend URL (z.B. Vue dev server)
-    "http://localhost:3000",  # Andere falls du sie nutzt
-    "http://localhost",       # oder auch localhost allgemein
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # erlaubt nur diese Hosts, "*" erlaubt alle (nicht empfohlen)
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],    # erlaubt alle Methoden wie GET, POST, OPTIONS
-    allow_headers=["*"],    # erlaubt alle Header
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
-# Anzahl Register
-REGISTER_ANZAHL = 16
+# ------------------------------------------------
+# REQUEST MODELS
+# ------------------------------------------------
 
-# Registerspeicher (FPGA-kompatibel)
-register_soll = [0] * REGISTER_ANZAHL
-register_ist = [0] * REGISTER_ANZAHL
+class FloatValue(BaseModel):
+    value: float
 
-# Metadaten
-metadaten = {
-    "geraete_name": "DeviceXYZ",
-    "seriennummer": "SN123456",
-    "firmware_version": "v1.0.0",
-    "letzte_aktualisierung": None
-}
 
-# Signaldefinitionen
+class BoolValue(BaseModel):
+    value: bool
 
-NUMERISCHE_SIGNALE = {
 
-    "spannung":
-    {
-        "register": 0,
-        "min": 0,
-        "max": 60
-    },
+class RegisterWrite(BaseModel):
+    values: list[int]
 
-    "strom":
-    {
-        "register": 1,
-        "min": 0,
-        "max": 10
-    },
-
-    "temperatur":
-    {
-        "register": 2,
-        "min": -40,
-        "max": 125
-    },
-}
-
-BINAERE_SIGNALE = {
-
-    "enable":
-    {
-        "register": 10,
-        "bit": 0
-    },
-
-    "reset":
-    {
-        "register": 10,
-        "bit": 1
-    },
-
-    "start":
-    {
-        "register": 10,
-        "bit": 2
-    },
-
-    "stop":
-    {
-        "register": 10,
-        "bit": 3
-    },
-
-    "freigabe":
-    {
-        "register": 10,
-        "bit": 4
-    },
-}
-
-# Update-Klassen
-
-class FloatWert(BaseModel):
-    wert: float
-
-class BinaerWert(BaseModel):
-    wert: bool
 
 class MetadatenUpdate(BaseModel):
 
@@ -112,151 +57,205 @@ class MetadatenUpdate(BaseModel):
     firmware_version: str | None = None
 
 
-# Hilfsfunktionen
+# ------------------------------------------------
+# METADATEN
+# ------------------------------------------------
 
-def get_bit(register, bit):
-    return (register >> bit) & 1
-
-
-def set_bit(register, bit, value):
-
-    if value:
-        return register | (1 << bit)
-    else:
-        return register & ~(1 << bit)
+metadaten = {
+    "geraete_name": "DeviceXYZ",
+    "seriennummer": "SN123456",
+    "firmware_version": "v1.0.0",
+    "letzte_aktualisierung": None
+}
 
 
-def get_bereich(signalname):
+# ------------------------------------------------
+# SIGNAL LISTE
+# ------------------------------------------------
 
-    if signalname not in NUMERISCHE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
-
-    return (
-        NUMERISCHE_SIGNALE[signalname]["min"],
-        NUMERISCHE_SIGNALE[signalname]["max"]
-    )
-
-
-# Numerisch SOLL
-
-@app.post("/numerisch/soll/{signalname}")
-def set_numerisch_soll(signalname: str, wert: FloatWert):
-
-    if signalname not in NUMERISCHE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
-
-    register = NUMERISCHE_SIGNALE[signalname]["register"]
-
-    min_wert, max_wert = get_bereich(signalname)
-
-    if not (min_wert <= wert.wert <= max_wert):
-
-        raise HTTPException(
-            400,
-            f"Wert außerhalb Bereich {min_wert} bis {max_wert}"
-        )
-
-    register_soll[register] = wert.wert
+@app.get("/signals")
+def get_signals():
 
     return {
-        "signal": signalname,
-        "register": register,
-        "wert": wert.wert
+        "numerisch": list(reg.num_map.keys()),
+        "binaer": list(reg.bin_map.keys())
     }
 
 
-@app.get("/numerisch/soll/{signalname}")
-def get_numerisch_soll(signalname: str):
+# ------------------------------------------------
+# GESAMTZUSTAND (Frontend Hauptendpoint)
+# ------------------------------------------------
 
-    if signalname not in NUMERISCHE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
+@app.get("/state")
+def get_state():
 
-    register = NUMERISCHE_SIGNALE[signalname]["register"]
+    numerisch_soll = {}
+    numerisch_ist = {}
+
+    binaer_soll = {}
+    binaer_ist = {}
+
+    for name in reg.num_map:
+
+        numerisch_soll[name] = reg.get_numerisch_soll(name)
+        numerisch_ist[name] = reg.get_numerisch_ist(name)
+
+    for name in reg.bin_map:
+
+        binaer_soll[name] = reg.get_binaer_soll(name)
+        binaer_ist[name] = reg.get_binaer_ist(name)
 
     return {
-        "signal": signalname,
-        "register": register,
-        "wert": register_soll[register]
+
+        "numerisch":
+        {
+            "soll": numerisch_soll,
+            "ist": numerisch_ist
+        },
+
+        "binaer":
+        {
+            "soll": binaer_soll,
+            "ist": binaer_ist
+        },
+
+        "register":
+        {
+            "soll": reg.get_register_soll(),
+            "ist": reg.get_register_ist()
+        },
+
+        "metadaten": metadaten
     }
 
 
-# Numerisch IST
+# ------------------------------------------------
+# NUMERISCH
+# ------------------------------------------------
 
-@app.get("/numerisch/ist/{signalname}")
-def get_numerisch_ist(signalname: str):
+@app.post("/numerisch/soll/{name}")
+def set_num_soll(name: str, req: FloatValue):
 
-    if signalname not in NUMERISCHE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
+    try:
 
-    register = NUMERISCHE_SIGNALE[signalname]["register"]
+        reg_value = reg.set_numerisch_soll(name, req.value)
 
-    return {
-        "signal": signalname,
-        "register": register,
-        "wert": register_ist[register]
-    }
+        return {
+            "signal": name,
+            "value": req.value,
+            "register": reg_value
+        }
 
-
-# Binär SOLL
-
-@app.post("/binaer/soll/{signalname}")
-def set_binaer_soll(signalname: str, wert: BinaerWert):
-
-    if signalname not in BINAERE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
-
-    register = BINAERE_SIGNALE[signalname]["register"]
-    bit = BINAERE_SIGNALE[signalname]["bit"]
-
-    register_soll[register] = set_bit(
-        register_soll[register],
-        bit,
-        wert.wert
-    )
-
-    return {
-        "signal": signalname,
-        "register": register,
-        "bit": bit,
-        "wert": wert.wert
-    }
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 
-@app.get("/binaer/soll/{signalname}")
-def get_binaer_soll(signalname: str):
+@app.get("/numerisch/soll/{name}")
+def get_num_soll(name: str):
 
-    if signalname not in BINAERE_SIGNALE:
-        raise HTTPException(404, "Signal unbekannt")
+    try:
+        return {"value": reg.get_numerisch_soll(name)}
 
-    register = BINAERE_SIGNALE[signalname]["register"]
-    bit = BINAERE_SIGNALE[signalname]["bit"]
-
-    wert = get_bit(register_soll[register], bit)
-
-    return {
-        "signal": signalname,
-        "register": register,
-        "bit": bit,
-        "wert": bool(wert)
-    }
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 
-# Register direkt (FPGA / Debug)
+@app.get("/numerisch/ist/{name}")
+def get_num_ist(name: str):
+
+    try:
+        return {"value": reg.get_numerisch_ist(name)}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+# ------------------------------------------------
+# BINAER
+# ------------------------------------------------
+
+@app.post("/binaer/soll/{name}")
+def set_bin_soll(name: str, req: BoolValue):
+
+    try:
+
+        reg.set_binaer_soll(name, req.value)
+
+        return {"signal": name, "value": req.value}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/binaer/soll/{name}")
+def get_bin_soll(name: str):
+
+    try:
+        return {"value": reg.get_binaer_soll(name)}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/binaer/ist/{name}")
+def get_bin_ist(name: str):
+
+    try:
+        return {"value": reg.get_binaer_ist(name)}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+# ------------------------------------------------
+# REGISTER DIREKT (FPGA Zugriff)
+# ------------------------------------------------
 
 @app.get("/register/soll")
 def get_register_soll():
-    return register_soll
+
+    return reg.get_register_soll()
+
+
+@app.post("/register/soll")
+def set_register_soll(req: RegisterWrite):
+
+    try:
+
+        reg.set_register_soll(req.values)
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/register/ist")
 def get_register_ist():
-    return register_ist
+
+    return reg.get_register_ist()
 
 
-# Metadaten
+@app.post("/register/ist")
+def set_register_ist(req: RegisterWrite):
+
+    try:
+
+        reg.set_register_ist(req.values)
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+# ------------------------------------------------
+# METADATEN
+# ------------------------------------------------
 
 @app.get("/metadaten")
 def get_metadaten():
+
     return metadaten
 
 
@@ -277,10 +276,17 @@ def update_metadaten(update: MetadatenUpdate):
     return metadaten
 
 
-#debug
+# ------------------------------------------------
+# LOOPBACK DEBUG
+# ------------------------------------------------
+
 @app.post("/loopback")
 def loopback():
-    global register_ist, register_soll
-    register_ist = register_soll.copy()
-    return {"message": "Loopback durchgeführt", "register_ist": register_ist}
 
+    reg.loopback()
+
+    return {
+
+        "message": "Loopback OK",
+        "register_ist": reg.get_register_ist()
+    }

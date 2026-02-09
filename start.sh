@@ -8,5 +8,5 @@ cd backend
 uvicorn main:app --reload &
 
 echo "Starte Frontend..."
-cd ../frontend/hmi
+cd ../frontend
 npm run dev &
