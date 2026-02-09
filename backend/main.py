@@ -1,8 +1,27 @@
 from fastapi import FastAPI, HTTPException
 from datetime import datetime
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
+
+
+#middleware options
+origins = [
+    "http://localhost:5173",  # Beispiel: dein Frontend URL (z.B. Vue dev server)
+    "http://localhost:3000",  # Andere falls du sie nutzt
+    "http://localhost",       # oder auch localhost allgemein
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # erlaubt nur diese Hosts, "*" erlaubt alle (nicht empfohlen)
+    allow_credentials=True,
+    allow_methods=["*"],    # erlaubt alle Methoden wie GET, POST, OPTIONS
+    allow_headers=["*"],    # erlaubt alle Header
+)
+
 
 # Anzahl Register
 REGISTER_ANZAHL = 16
@@ -256,3 +275,12 @@ def update_metadaten(update: MetadatenUpdate):
     metadaten["letzte_aktualisierung"] = datetime.now()
 
     return metadaten
+
+
+#debug
+@app.post("/loopback")
+def loopback():
+    global register_ist, register_soll
+    register_ist = register_soll.copy()
+    return {"message": "Loopback durchgeführt", "register_ist": register_ist}
+
