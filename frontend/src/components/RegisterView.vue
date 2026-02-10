@@ -1,3 +1,4 @@
+
 <template>
   <div>
     <h2>Registeransicht</h2>
@@ -6,31 +7,16 @@
       Aktualisieren
     </el-button>
 
-    <h3>SOLL-Register</h3>
+    <h3>Register</h3>
     <el-table :data="registerSoll" style="width: 100%" border>
-      <el-table-column prop="index" label="Index" width="80"/>
+      <el-table-column prop="index" label="Index" width="60"/>
       <el-table-column label="Inhalt">
         <template #default="scope">
           <el-input-number
             v-model="scope.row.value"
             :min="0"
             :max="65535"
-            @change="updateRegisterSoll(scope.row)"
-          />
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <h3 style="margin-top: 20px;">IST-Register (Simulation)</h3>
-    <el-table :data="registerIst" style="width: 100%" border>
-      <el-table-column prop="index" label="Index" width="80"/>
-      <el-table-column label="Inhalt">
-        <template #default="scope">
-          <el-input-number
-            v-model="scope.row.value"
-            :min="0"
-            :max="65535"
-            @change="updateRegisterIst(scope.row)"
+            @change="updateRegister(scope.row)"
           />
         </template>
       </el-table-column>
@@ -39,41 +25,74 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { ref, onMounted } from "vue"
 
-const registerSoll = reactive([])
-const registerIst = reactive([])
+const API = "http://localhost:8000"
 
-const loadRegisters = async () => {
-  // SOLL
-  const resSoll = await fetch('http://localhost:8000/register/soll')
-  const dataSoll = await resSoll.json()
-  registerSoll.length = 0
-  dataSoll.forEach((val, idx) => registerSoll.push({ index: idx, value: val }))
+// Registerliste für die Tabelle
+const registerSoll = ref([])
 
-  // IST
-  const resIst = await fetch('http://localhost:8000/register/ist')
-  const dataIst = await resIst.json()
-  registerIst.length = 0
-  dataIst.forEach((val, idx) => registerIst.push({ index: idx, value: val }))
+
+// ------------------------------------------------
+// REGISTER LADEN
+// ------------------------------------------------
+
+async function loadRegisters() {
+  try {
+
+    const response = await fetch(`${API}/register`)
+
+    if (!response.ok) {
+      throw new Error(`HTTP Fehler: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    // Backend liefert: { register: [int, int, int, ...] }
+
+    registerSoll.value = data.register.map((value, index) => ({
+      index: index,
+      value: value
+    }))
+
+  } catch (err) {
+    console.error("Fehler beim Laden der Register:", err)
+  }
 }
 
-const updateRegisterSoll = async (row) => {
-  await fetch(`http://localhost:8000/register/soll`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: registerSoll.map(r => r.value) })
-  })
+
+// ------------------------------------------------
+// REGISTER SCHREIBEN
+// ------------------------------------------------
+
+async function updateRegister(row) {
+  try {
+
+    const response = await fetch(`${API}/register/${row.index}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        value: row.value
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP Fehler: ${response.status}`)
+    }
+
+  } catch (err) {
+    console.error("Fehler beim Schreiben des Registers:", err)
+  }
 }
 
-const updateRegisterIst = async (row) => {
-  await fetch(`http://localhost:8000/register/ist`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: registerIst.map(r => r.value) })
-  })
-}
 
-// direkt beim Laden initialisieren
-loadRegisters()
+// ------------------------------------------------
+// AUTOMATISCH LADEN BEI START
+// ------------------------------------------------
+
+onMounted(() => {
+  loadRegisters()
+})
 </script>

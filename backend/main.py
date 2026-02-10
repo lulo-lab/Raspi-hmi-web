@@ -16,7 +16,7 @@ reg = RegisterService("register_map.json")
 
 
 # ------------------------------------------------
-# CORS
+# CORS - welche Daten dürfen ausgetauscht werden
 # ------------------------------------------------
 
 origins = [
@@ -38,23 +38,23 @@ app.add_middleware(
 # REQUEST MODELS
 # ------------------------------------------------
 
-class FloatValue(BaseModel):
+class Float(BaseModel):
     value: float
 
 
-class BoolValue(BaseModel):
+class Bool(BaseModel):
     value: bool
 
 
-class RegisterWrite(BaseModel):
+class MultiRegister(BaseModel):
     values: list[int]
 
 
-class RegisterValue(BaseModel):
+class Register(BaseModel):
     value: int
     
 
-class MetadatenUpdate(BaseModel):
+class Metadaten(BaseModel):
 
     geraete_name: str | None = None
     seriennummer: str | None = None
@@ -93,43 +93,15 @@ def get_signals():
 @app.get("/state")
 def get_state():
 
-    numerisch_soll = {}
-    numerisch_ist = {}
-
-    binaer_soll = {}
-    binaer_ist = {}
-
-    for name in reg.num_map:
-
-        numerisch_soll[name] = reg.get_numerisch_soll(name)
-        numerisch_ist[name] = reg.get_numerisch_ist(name)
-
-    for name in reg.bin_map:
-
-        binaer_soll[name] = reg.get_binaer_soll(name)
-        binaer_ist[name] = reg.get_binaer_ist(name)
-
     return {
-
-        "numerisch":
-        {
-            "soll": numerisch_soll,
-            "ist": numerisch_ist
+        "numerisch": {
+            name: reg.get_numerisch(name)
+            for name in reg.num_map
         },
-
-        "binaer":
-        {
-            "soll": binaer_soll,
-            "ist": binaer_ist
-        },
-
-        "register":
-        {
-            "soll": reg.get_register_soll(),
-            "ist": reg.get_register_ist()
-        },
-
-        "metadaten": metadaten
+        "binaer": {
+            name: reg.get_binaer(name)
+            for name in reg.bin_map
+        }
     }
 
 
@@ -137,53 +109,40 @@ def get_state():
 # NUMERISCH
 # ------------------------------------------------
 
-@app.post("/numerisch/soll/{name}")
-def set_num_soll(name: str, req: FloatValue):
+@app.post("/numerisch/{name}")
+def set_num(name: str, req: Float):
 
     try:
 
-        reg_value = reg.set_numerisch_soll(name, req.value)
+        reg.set_numerisch(name, req.value)
 
         return {
             "signal": name,
-            "value": req.value,
-            "register": reg_value
+            "value": req.value
         }
 
     except Exception as e:
         raise HTTPException(400, str(e))
 
-
-@app.get("/numerisch/soll/{name}")
-def get_num_soll(name: str):
+@app.get("/numerisch/{name}")
+def get_num(name: str):
 
     try:
-        return {"value": reg.get_numerisch_soll(name)}
+        return {"value": reg.get_numerisch(name)}
 
     except Exception as e:
         raise HTTPException(400, str(e))
-
-
-@app.get("/numerisch/ist/{name}")
-def get_num_ist(name: str):
-
-    try:
-        return {"value": reg.get_numerisch_ist(name)}
-
-    except Exception as e:
-        raise HTTPException(400, str(e))
-
 
 # ------------------------------------------------
 # BINAER
 # ------------------------------------------------
 
-@app.post("/binaer/soll/{name}")
-def set_bin_soll(name: str, req: BoolValue):
+@app.post("/binaer/{name}")
+def set_bin(name: str, req: Bool):
 
     try:
 
-        reg.set_binaer_soll(name, req.value)
+        reg.set_binaer(name, req.value)
 
         return {"signal": name, "value": req.value}
 
@@ -191,135 +150,86 @@ def set_bin_soll(name: str, req: BoolValue):
         raise HTTPException(400, str(e))
 
 
-@app.get("/binaer/soll/{name}")
-def get_bin_soll(name: str):
+@app.get("/binaer/{name}")
+def get_bin(name: str):
 
     try:
-        return {"value": reg.get_binaer_soll(name)}
-
-    except Exception as e:
-        raise HTTPException(400, str(e))
-
-
-@app.get("/binaer/ist/{name}")
-def get_bin_ist(name: str):
-
-    try:
-        return {"value": reg.get_binaer_ist(name)}
+        return {"value": reg.get_binaer(name)}
 
     except Exception as e:
         raise HTTPException(400, str(e))
 
 
 # ------------------------------------------------
-# REGISTER DIREKT (FPGA Zugriff)
+# REGISTER DIREKT
 # ------------------------------------------------
 
-@app.get("/register/soll")
-def get_register_soll():
-
-    return reg.get_register_soll()
-
-
-@app.post("/register/soll")
-def set_register_soll(req: RegisterWrite):
+@app.post("/register")
+def set_register(req: MultiRegister):
 
     try:
 
-        reg.set_register_soll(req.values)
-
+        reg.set_register(req.values)
         return {"status": "ok"}
 
     except Exception as e:
         raise HTTPException(400, str(e))
 
 
-@app.get("/register/ist")
-def get_register_ist():
-
-    return reg.get_register_ist()
-
-
-@app.post("/register/ist")
-def set_register_ist(req: RegisterWrite):
+@app.get("/register")
+def get_register():
 
     try:
-
-        reg.set_register_ist(req.values)
-
-        return {"status": "ok"}
+        return {
+            "register": reg.get_register()
+        }
 
     except Exception as e:
         raise HTTPException(400, str(e))
 
 
-@app.post("/register/soll/{index}")
-def set_register_soll_index(index: int, req: RegisterValue):
+@app.post("/register/{index}")
+def set_register_index(index: int, req: Register):
 
     try:
 
-        reg.set_register_soll_index(index, req.value)
+        reg.set_register_index(index, req.value)
 
         return {
             "index": index,
             "value": req.value
         }
 
+    except IndexError:
+        raise HTTPException(404, "Register index out of range")
+
     except Exception as e:
         raise HTTPException(400, str(e))
-
-
-@app.get("/register/soll/{index}")
-def get_register_soll_index(self, index: int):
-
-    if index < 0 or index >= len(self.register_soll):
-        raise Exception("Registerindex außerhalb Bereich")
-
-    return self.register_soll[index]
-
-
-@app.get("/register/ist/{index}")
-def get_register_ist_index(index: int):
+        
+        
+@app.get("/register/{index}")
+def get_register_index(index: int):
 
     try:
+        value = reg.get_register_index(index)
 
         return {
             "index": index,
-            "value": reg.get_register_ist_index(index)
+            "value": value
         }
+
+    except IndexError:
+        raise HTTPException(404, "Register index out of range")
 
     except Exception as e:
         raise HTTPException(400, str(e))
-
-
-@app.post("/register/ist/{index}")
-def set_register_ist_index(index: int, req: RegisterValue):
-
-    try:
-
-        reg.set_register_ist_index(index, req.value)
-
-        return {
-            "index": index,
-            "value": req.value
-        }
-
-    except Exception as e:
-        raise HTTPException(400, str(e))
-
 
 # ------------------------------------------------
 # METADATEN
 # ------------------------------------------------
 
-@app.get("/metadaten")
-def get_metadaten():
-
-    return metadaten
-
-
 @app.post("/metadaten")
-def update_metadaten(update: MetadatenUpdate):
+def update_metadaten(update: Metadaten):
 
     if update.geraete_name is not None:
         metadaten["geraete_name"] = update.geraete_name
@@ -334,3 +244,8 @@ def update_metadaten(update: MetadatenUpdate):
 
     return metadaten
 
+
+@app.get("/metadaten")
+def get_metadaten():
+
+    return metadaten

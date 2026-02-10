@@ -1,140 +1,255 @@
 <template>
   <div>
+
     <h2>Steuerung</h2>
 
-    <el-button type="primary" @click="loadState" style="margin-bottom: 20px">
+    <el-button
+      type="primary"
+      @click="loadState"
+      style="margin-bottom: 20px"
+    >
       Aktualisieren
     </el-button>
 
-    <!-- Numerische Signale -->
-    <el-card class="box-card" style="margin-bottom: 20px">
-      <div slot="header">
-        <span>Numerische Signale</span>
-      </div>
 
-      <el-table :data="numerischeSignals" style="width: 100%">
-        <el-table-column prop="name" label="Signal" width="180"/>
-        
-        <el-table-column label="Sollwert">
-          <template #default="scope">
-            <el-input
-              v-model.number="scope.row.soll"
-              size="small"
-              :disabled="scope.row.access !== 'rw'"
-              @change="setNumSoll(scope.row)"
-            >
-              <template #append>{{ scope.row.unit }}</template>
-            </el-input>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="Istwert">
-          <template #default="scope">
-            {{ scope.row.ist }} {{ scope.row.unit }}
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- Binäre Signale -->
+    <!-- NUMERISCH -->
     <el-card class="box-card">
-      <div slot="header">
-        <span>Binäre Signale</span>
-      </div>
 
-      <el-table :data="binaerSignals" style="width: 100%">
-        <el-table-column prop="name" label="Signal" width="180"/>
+      <template #header>
+        Numerische Signale
+      </template>
 
-        <el-table-column label="Sollwert">
+      <el-table
+        :data="numerisch"
+        border
+        style="width: 100%"
+      >
+
+        <!-- Name -->
+        <el-table-column
+          prop="name"
+          label="Name"
+          width="auto"
+        />
+
+        <!-- Vorgabe -->
+        <el-table-column
+          label="Vorgabe"
+          width="140"
+        >
           <template #default="scope">
-            <el-switch
-              v-model="scope.row.soll"
-              :disabled="scope.row.access !== 'rw'"
-              @change="setBinSoll(scope.row)"
+            <el-input-number
+              v-model="scope.row.vorgabe"
+              @change="setNumerisch(scope.row)"
+              style="width: 120px"
             />
           </template>
         </el-table-column>
 
-        <el-table-column label="Istwert">
+        <!-- Istwert -->
+        <el-table-column
+          prop="istwert"
+          label="Istwert"
+          width="120"
+        />
+
+        <!-- Einheit -->
+        <el-table-column
+          prop="einheit"
+          label="Einheit"
+          width="100"
+        />
+
+      </el-table>
+
+    </el-card>
+
+
+    <!-- BINAER -->
+    <el-card class="box-card">
+
+      <template #header>
+        Binäre Signale
+      </template>
+
+      <el-table
+        :data="binaer"
+        border
+        style="width: 100%"
+      >
+
+        <!-- Name -->
+        <el-table-column
+          prop="name"
+          label="Name"
+          width="auto"
+        />
+
+        <!-- Vorgabe -->
+        <el-table-column
+          label="Vorgabe"
+          width="120"
+        >
           <template #default="scope">
-            <el-switch v-model="scope.row.ist" disabled />
+            <el-switch
+              v-model="scope.row.vorgabe"
+              @change="setBinaer(scope.row)"
+            />
           </template>
         </el-table-column>
+
+        <!-- Istwert -->
+        <el-table-column
+          label="Istwert"
+          width="120"
+        >
+          <template #default="scope">
+            <el-switch
+              :model-value="scope.row.istwert"
+              disabled
+            />
+          </template>
+        </el-table-column>
+
       </el-table>
+
     </el-card>
+
   </div>
 </template>
 
+
 <script setup>
-import { reactive } from 'vue'
 
-const numerischeSignals = reactive([])
-const binaerSignals = reactive([])
+import { ref, onMounted } from "vue"
 
-const loadState = async () => {
+const API = "http://localhost:8000"
+
+const numerisch = ref([])
+const binaer = ref([])
+
+
+// ------------------------------------------------
+// STATE LADEN
+// ------------------------------------------------
+
+async function loadState() {
+
   try {
-    const res = await fetch('http://localhost:8000/state')
-    const state = await res.json()
 
-    // Numerische Signale
-    numerischeSignals.length = 0
-    Object.entries(state.numerisch.soll).forEach(([name, val]) => {
-      numerischeSignals.push({
+    const res = await fetch(`${API}/state`)
+    const data = await res.json()
+
+
+    numerisch.value = Object.entries(data.numerisch).map(
+      ([name, value]) => ({
         name,
-        soll: val.value,
-        ist: state.numerisch.ist[name]?.value ?? 0,
-        unit: val.unit ?? '',
-        access: val.access ?? 'rw'
+        vorgabe: value,
+        istwert: value,
+        einheit: ""
       })
-    })
+    )
 
-    // Binäre Signale
-    binaerSignals.length = 0
-    Object.entries(state.binaer.soll).forEach(([name, val]) => {
-      binaerSignals.push({
+
+    binaer.value = Object.entries(data.binaer).map(
+      ([name, value]) => ({
         name,
-        soll: val.value,
-        ist: state.binaer.ist[name]?.value ?? false,
-        access: val.access ?? 'rw'
+        vorgabe: value,
+        istwert: value
       })
-    })
-  } catch (err) {
-    console.error('Fehler beim Laden der Signale:', err)
+    )
+
   }
+  catch (err) {
+
+    console.error("State laden fehlgeschlagen:", err)
+
+  }
+
 }
 
-// Numerisch Sollwert setzen
-const setNumSoll = async (row) => {
+
+// ------------------------------------------------
+// NUMERISCH SETZEN
+// ------------------------------------------------
+
+async function setNumerisch(row) {
+
   try {
-    await fetch(`http://localhost:8000/numerisch/soll/${row.name}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: Number(row.soll) })
+
+    await fetch(`${API}/numerisch/${row.name}`, {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        value: row.vorgabe
+      })
+
     })
-  } catch (err) {
-    console.error('Fehler beim Setzen des Sollwerts:', err)
+
+    row.istwert = row.vorgabe
+
   }
+  catch (err) {
+
+    console.error("Numerisch schreiben fehlgeschlagen:", err)
+
+  }
+
 }
 
-// Binär Sollwert setzen
-const setBinSoll = async (row) => {
+
+// ------------------------------------------------
+// BINAER SETZEN
+// ------------------------------------------------
+
+async function setBinaer(row) {
+
   try {
-    await fetch(`http://localhost:8000/binaer/soll/${row.name}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: row.soll })
+
+    await fetch(`${API}/binaer/${row.name}`, {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+        value: row.vorgabe
+      })
+
     })
-  } catch (err) {
-    console.error('Fehler beim Setzen des Sollwerts:', err)
+
+    row.istwert = row.vorgabe
+
   }
+  catch (err) {
+
+    console.error("Binär schreiben fehlgeschlagen:", err)
+
+  }
+
 }
 
-// Direkt beim Laden initialisieren
-loadState()
+
+// ------------------------------------------------
+// INIT
+// ------------------------------------------------
+
+onMounted(loadState)
+
 </script>
 
+
 <style scoped>
+
 .box-card {
   margin-bottom: 20px;
 }
+
 </style>

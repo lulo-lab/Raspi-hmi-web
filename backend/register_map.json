@@ -1,8 +1,7 @@
 {
   "register": {
     "count": 16,
-    "width": 16,
-    "signed": false
+    "width": 16
   },
 
   "numerisch": {
@@ -25,16 +24,6 @@
       "max": 10.0,
       "unit": "A",
       "access": "rw"
-    },
-
-    "temperatur": {
-      "register": 2,
-      "type": "int16",
-      "scale": 10.0,
-      "min": -40.0,
-      "max": 125.0,
-      "unit": "°C",
-      "access": "r"
     },
 
     "leistung": {
@@ -65,12 +54,6 @@
     "start": {
       "register": 10,
       "bit": 2,
-      "access": "rw"
-    },
-
-    "stop": {
-      "register": 10,
-      "bit": 3,
       "access": "rw"
     },
 
