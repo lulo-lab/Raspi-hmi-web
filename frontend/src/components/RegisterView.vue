@@ -3,96 +3,191 @@
   <div>
     <h2>Registeransicht</h2>
 
-    <el-button type="primary" @click="loadRegisters" style="margin-bottom: 20px;">
+    <el-button
+      type="primary"
+      @click="aktualisieren"
+      style="margin-bottom: 20px"
+    >
       Aktualisieren
     </el-button>
 
-    <h3>Register</h3>
-    <el-table :data="registerSoll" style="width: 100%" border>
-      <el-table-column prop="index" label="Index" width="60"/>
-      <el-table-column label="Inhalt">
+    <el-table
+      :data="registers"
+      border
+      style="width: 100%"
+      height="600"
+    >
+
+      <el-table-column
+        prop="index"
+        label="Index"
+        width="70"
+      />
+
+      <el-table-column
+        label="Sollwert"
+        width="140"
+      >
         <template #default="scope">
           <el-input-number
-            v-model="scope.row.value"
+            v-model="scope.row.sollwert"
             :min="0"
             :max="65535"
-            @change="updateRegister(scope.row)"
+            :disabled="!scope.row.freigabe"
+            style="width: 120px"
           />
         </template>
       </el-table-column>
+
+      <el-table-column
+        prop="istwert"
+        label="Istwert"
+        width="100"
+      />
+
+      <el-table-column
+        label="Freigabe"
+        width="90"
+      >
+        <template #default="scope">
+          <el-checkbox v-model="scope.row.freigabe"/>
+        </template>
+      </el-table-column>
+
     </el-table>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted } from "vue";
 
-const API = "http://localhost:8000"
-
-// Registerliste für die Tabelle
-const registerSoll = ref([])
+const registers = ref([]);
 
 
-// ------------------------------------------------
-// REGISTER LADEN
-// ------------------------------------------------
+/*
+Initialisierung (nur einmal)
+*/
+const initRegisters = async () => {
 
-async function loadRegisters() {
   try {
 
-    const response = await fetch(`${API}/register`)
+    const res = await fetch("http://localhost:8000/register");
 
-    if (!response.ok) {
-      throw new Error(`HTTP Fehler: ${response.status}`)
-    }
+    if (!res.ok)
+      throw new Error("Register konnten nicht geladen werden");
 
-    const data = await response.json()
+    const data = await res.json();
 
-    // Backend liefert: { register: [int, int, int, ...] }
+    registers.value = data.register.map((value, index) => ({
+      index,
+      sollwert: value,
+      istwert: value,
+      freigabe: false
+    }));
 
-    registerSoll.value = data.register.map((value, index) => ({
-      index: index,
-      value: value
-    }))
-
-  } catch (err) {
-    console.error("Fehler beim Laden der Register:", err)
   }
-}
+  catch (err) {
+
+    console.error(err);
+
+  }
+
+};
 
 
-// ------------------------------------------------
-// REGISTER SCHREIBEN
-// ------------------------------------------------
+/*
+Istwerte lesen
+*/
+const readIstwerte = async () => {
 
-async function updateRegister(row) {
   try {
 
-    const response = await fetch(`${API}/register/${row.index}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        value: row.value
-      })
-    })
+    const res = await fetch("http://localhost:8000/register");
 
-    if (!response.ok) {
-      throw new Error(`HTTP Fehler: ${response.status}`)
+    if (!res.ok)
+      throw new Error("Register konnten nicht gelesen werden");
+
+    const data = await res.json();
+
+    data.register.forEach((value, index) => {
+
+      registers.value[index].istwert = value;
+
+    });
+
+  }
+  catch (err) {
+
+    console.error(err);
+
+  }
+
+};
+
+
+/*
+Freigegebene Sollwerte schreiben
+*/
+const writeFreigegebene = async () => {
+
+  try {
+
+    for (const reg of registers.value) {
+
+      if (!reg.freigabe)
+        continue;
+
+      const res = await fetch(
+        `http://localhost:8000/register/${reg.index}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            value: reg.sollwert
+          })
+        }
+      );
+
+      if (!res.ok)
+        throw new Error(`Fehler bei Register ${reg.index}`);
+
     }
 
-  } catch (err) {
-    console.error("Fehler beim Schreiben des Registers:", err)
   }
-}
+  catch (err) {
+
+    console.error(err);
+
+  }
+
+};
 
 
-// ------------------------------------------------
-// AUTOMATISCH LADEN BEI START
-// ------------------------------------------------
+/*
+Aktualisieren Button
+*/
+const aktualisieren = async () => {
 
-onMounted(() => {
-  loadRegisters()
-})
+  await writeFreigegebene();
+
+  await readIstwerte();
+
+};
+
+
+/*
+Startup
+*/
+onMounted(async () => {
+
+  await initRegisters();
+
+  await readIstwerte();
+
+});
+
 </script>
+

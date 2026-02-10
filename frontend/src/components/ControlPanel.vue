@@ -15,7 +15,7 @@
       <el-table :data="numerischeSignals" style="width: 100%">
         <el-table-column prop="name" label="Signal" width="70" />
 
-        <el-table-column label="Vorgabe" width="130">
+        <el-table-column label="Vorgabe" width="133">
           <template #default="scope">
             <el-input-number
               v-model.number="scope.row.vorgabe"
@@ -34,9 +34,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="Einheit" width="30" prop="unit" />
+        <el-table-column label="" width="40" prop="unit" />
 
-        <el-table-column label="Access" width="30" prop="access" />
+        <el-table-column label="" width="45" prop="access" />
 
         <el-table-column label="Min" width="70" prop="min" />
 
