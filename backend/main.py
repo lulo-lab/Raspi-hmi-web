@@ -50,6 +50,10 @@ class RegisterWrite(BaseModel):
     values: list[int]
 
 
+class RegisterValue(BaseModel):
+    value: int
+    
+
 class MetadatenUpdate(BaseModel):
 
     geraete_name: str | None = None
@@ -249,6 +253,61 @@ def set_register_ist(req: RegisterWrite):
         raise HTTPException(400, str(e))
 
 
+@app.post("/register/soll/{index}")
+def set_register_soll_index(index: int, req: RegisterValue):
+
+    try:
+
+        reg.set_register_soll_index(index, req.value)
+
+        return {
+            "index": index,
+            "value": req.value
+        }
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/register/soll/{index}")
+def get_register_soll_index(self, index: int):
+
+    if index < 0 or index >= len(self.register_soll):
+        raise Exception("Registerindex außerhalb Bereich")
+
+    return self.register_soll[index]
+
+
+@app.get("/register/ist/{index}")
+def get_register_ist_index(index: int):
+
+    try:
+
+        return {
+            "index": index,
+            "value": reg.get_register_ist_index(index)
+        }
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/register/ist/{index}")
+def set_register_ist_index(index: int, req: RegisterValue):
+
+    try:
+
+        reg.set_register_ist_index(index, req.value)
+
+        return {
+            "index": index,
+            "value": req.value
+        }
+
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 # ------------------------------------------------
 # METADATEN
 # ------------------------------------------------
@@ -275,18 +334,3 @@ def update_metadaten(update: MetadatenUpdate):
 
     return metadaten
 
-
-# ------------------------------------------------
-# LOOPBACK DEBUG
-# ------------------------------------------------
-
-@app.post("/loopback")
-def loopback():
-
-    reg.loopback()
-
-    return {
-
-        "message": "Loopback OK",
-        "register_ist": reg.get_register_ist()
-    }

@@ -182,10 +182,46 @@ class RegisterService:
 
         self.register_ist = values.copy()
 
+
+    def set_register_soll_index(self, index: int, value: int):
+        if index < 0 or index >= len(self.register_soll):
+            raise Exception("Registerindex außerhalb Bereich")
+
+        if value < 0 or value > 0xFFFF:
+            raise Exception("Registerwert außerhalb 16bit Bereich")
+
+        self.register_soll[index] = value
+
+
+    def get_register_soll_index(self, index: int):
+
+        if index < 0 or index >= len(self.register_soll):
+            raise Exception("Registerindex außerhalb Bereich")
+
+        return self.register_soll[index]
+
+
+    def get_register_ist_index(self, index: int):
+
+        if index < 0 or index >= len(self.register_ist):
+            raise Exception("Registerindex außerhalb Bereich")
+
+        return self.register_ist[index]
+
+
+    def set_register_ist_index(self, index: int, value: int):
+
+        if index < 0 or index >= len(self.register_ist):
+            raise Exception("Registerindex außerhalb Bereich")
+
+        if value < 0 or value > 0xFFFF:
+            raise Exception("Registerwert außerhalb 16bit Bereich")
+
+        self.register_ist[index] = value
+
+
     # ------------------------------------------------
     # Debug
     # ------------------------------------------------
 
-    def loopback(self):
-
-        self.register_ist = self.register_soll.copy()
+    
