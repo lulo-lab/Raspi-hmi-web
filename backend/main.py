@@ -92,16 +92,29 @@ def get_signals():
 
 @app.get("/state")
 def get_state():
+    numerisch = {}
+    binaer = {}
+
+    for name, signal in reg.num_map.items():
+        value = reg.get_numerisch(name)
+        numerisch[name] = {
+            "value": value,
+            "unit": signal.get("unit", ""),
+            "access": signal.get("access", "rw"),
+            "min": signal.get("min", -1000000),
+            "max": signal.get("max", 1000000)
+        }
+
+    for name, signal in reg.bin_map.items():
+        value = reg.get_binaer(name)
+        binaer[name] = {
+            "value": value,
+            "access": signal.get("access", "rw")
+        }
 
     return {
-        "numerisch": {
-            name: reg.get_numerisch(name)
-            for name in reg.num_map
-        },
-        "binaer": {
-            name: reg.get_binaer(name)
-            for name in reg.bin_map
-        }
+        "numerisch": numerisch,
+        "binaer": binaer
     }
 
 

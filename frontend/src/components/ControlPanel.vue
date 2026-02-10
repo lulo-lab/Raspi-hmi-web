@@ -1,255 +1,147 @@
 <template>
   <div>
-
     <h2>Steuerung</h2>
 
-    <el-button
-      type="primary"
-      @click="loadState"
-      style="margin-bottom: 20px"
-    >
+    <el-button type="primary" @click="loadState" style="margin-bottom: 20px;">
       Aktualisieren
     </el-button>
 
+    <!-- Numerische Signale -->
+    <el-card class="box-card" style="margin-bottom: 20px;">
+      <div slot="header">
+        <span>Numerische Signale</span>
+      </div>
 
-    <!-- NUMERISCH -->
-    <el-card class="box-card">
+      <el-table :data="numerischeSignals" style="width: 100%">
+        <el-table-column prop="name" label="Signal" width="70" />
 
-      <template #header>
-        Numerische Signale
-      </template>
-
-      <el-table
-        :data="numerisch"
-        border
-        style="width: 100%"
-      >
-
-        <!-- Name -->
-        <el-table-column
-          prop="name"
-          label="Name"
-          width="auto"
-        />
-
-        <!-- Vorgabe -->
-        <el-table-column
-          label="Vorgabe"
-          width="140"
-        >
+        <el-table-column label="Vorgabe" width="130">
           <template #default="scope">
             <el-input-number
-              v-model="scope.row.vorgabe"
-              @change="setNumerisch(scope.row)"
-              style="width: 120px"
+              v-model.number="scope.row.vorgabe"
+              :min="scope.row.min"
+              :max="scope.row.max"
+              size="small"
+              :disabled="scope.row.access !== 'rw'"
+              @change="setNum(scope.row)"
             />
           </template>
         </el-table-column>
 
-        <!-- Istwert -->
-        <el-table-column
-          prop="istwert"
-          label="Istwert"
-          width="120"
-        />
+        <el-table-column label="Ist" width="70">
+          <template #default="scope">
+            {{ scope.row.istwert }}
+          </template>
+        </el-table-column>
 
-        <!-- Einheit -->
-        <el-table-column
-          prop="einheit"
-          label="Einheit"
-          width="100"
-        />
+        <el-table-column label="Einheit" width="30" prop="unit" />
 
+        <el-table-column label="Access" width="30" prop="access" />
+
+        <el-table-column label="Min" width="70" prop="min" />
+
+        <el-table-column label="Max" width="70" prop="max" />
       </el-table>
-
     </el-card>
 
-
-    <!-- BINAER -->
+    <!-- Binäre Signale -->
     <el-card class="box-card">
+      <div slot="header">
+        <span>Binäre Signale</span>
+      </div>
 
-      <template #header>
-        Binäre Signale
-      </template>
+      <el-table :data="binaerSignals" style="width: 100%">
+        <el-table-column prop="name" label="Signal" width="70" />
 
-      <el-table
-        :data="binaer"
-        border
-        style="width: 100%"
-      >
-
-        <!-- Name -->
-        <el-table-column
-          prop="name"
-          label="Name"
-          width="auto"
-        />
-
-        <!-- Vorgabe -->
-        <el-table-column
-          label="Vorgabe"
-          width="120"
-        >
+        <el-table-column label="Vorgabe" width="70">
           <template #default="scope">
             <el-switch
               v-model="scope.row.vorgabe"
-              @change="setBinaer(scope.row)"
+              :disabled="scope.row.access !== 'rw'"
+              @change="setBin(scope.row)"
             />
           </template>
         </el-table-column>
 
-        <!-- Istwert -->
-        <el-table-column
-          label="Istwert"
-          width="120"
-        >
+        <el-table-column label="Istwert" width="70">
           <template #default="scope">
-            <el-switch
-              :model-value="scope.row.istwert"
-              disabled
-            />
+            {{ scope.row.istwert }}
           </template>
         </el-table-column>
 
+        <el-table-column label="Access" width="30" prop="access" />
       </el-table>
-
     </el-card>
-
   </div>
 </template>
 
 
 <script setup>
+import { reactive } from "vue"
 
-import { ref, onMounted } from "vue"
+const numerischeSignals = reactive([])
+const binaerSignals = reactive([])
 
-const API = "http://localhost:8000"
-
-const numerisch = ref([])
-const binaer = ref([])
-
-
-// ------------------------------------------------
-// STATE LADEN
-// ------------------------------------------------
-
-async function loadState() {
-
+const loadState = async () => {
   try {
-
-    const res = await fetch(`${API}/state`)
+    const res = await fetch("http://localhost:8000/state")
     const data = await res.json()
 
+    numerischeSignals.length = 0
+    binaerSignals.length = 0
 
-    numerisch.value = Object.entries(data.numerisch).map(
-      ([name, value]) => ({
+    for (const [name, info] of Object.entries(data.numerisch)) {
+      numerischeSignals.push({
         name,
-        vorgabe: value,
-        istwert: value,
-        einheit: ""
+        vorgabe: info.value,
+        istwert: info.value,
+        unit: info.unit || "",
+        access: info.access || "rw",
+        min: info.min ?? 0,
+        max: info.max ?? 1000
       })
-    )
+    }
 
-
-    binaer.value = Object.entries(data.binaer).map(
-      ([name, value]) => ({
+    for (const [name, info] of Object.entries(data.binaer)) {
+      binaerSignals.push({
         name,
-        vorgabe: value,
-        istwert: value
+        vorgabe: info.value,
+        istwert: info.value,
+        access: info.access || "rw"
       })
-    )
-
+    }
+  } catch (err) {
+    console.error("Fehler beim Laden des States:", err)
   }
-  catch (err) {
-
-    console.error("State laden fehlgeschlagen:", err)
-
-  }
-
 }
 
-
-// ------------------------------------------------
-// NUMERISCH SETZEN
-// ------------------------------------------------
-
-async function setNumerisch(row) {
-
+const setNum = async (row) => {
   try {
-
-    await fetch(`${API}/numerisch/${row.name}`, {
-
+    const res = await fetch(`http://localhost:8000/numerisch/${row.name}`, {
       method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        value: row.vorgabe
-      })
-
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: Number(row.vorgabe) })
     })
-
-    row.istwert = row.vorgabe
-
+    const data = await res.json()
+    row.istwert = data.value
+  } catch (err) {
+    console.error("Fehler beim Setzen des numerischen Werts:", err)
   }
-  catch (err) {
-
-    console.error("Numerisch schreiben fehlgeschlagen:", err)
-
-  }
-
 }
 
-
-// ------------------------------------------------
-// BINAER SETZEN
-// ------------------------------------------------
-
-async function setBinaer(row) {
-
+const setBin = async (row) => {
   try {
-
-    await fetch(`${API}/binaer/${row.name}`, {
-
+    const res = await fetch(`http://localhost:8000/binaer/${row.name}`, {
       method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        value: row.vorgabe
-      })
-
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: Boolean(row.vorgabe) })
     })
-
-    row.istwert = row.vorgabe
-
+    const data = await res.json()
+    row.istwert = data.value
+  } catch (err) {
+    console.error("Fehler beim Setzen des binären Werts:", err)
   }
-  catch (err) {
-
-    console.error("Binär schreiben fehlgeschlagen:", err)
-
-  }
-
 }
 
-
-// ------------------------------------------------
-// INIT
-// ------------------------------------------------
-
-onMounted(loadState)
-
+loadState()
 </script>
-
-
-<style scoped>
-
-.box-card {
-  margin-bottom: 20px;
-}
-
-</style>
